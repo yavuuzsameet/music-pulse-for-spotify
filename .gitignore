@@ -1,2 +1,5 @@
 terraform/ignore.txt
-
+terraform/terraform.tfstate
+terraform/.terraform/
+terraform/.terraform.*
+terraform/terraform.tfvars
