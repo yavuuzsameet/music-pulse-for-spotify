@@ -3,3 +3,8 @@ terraform/terraform.tfstate
 terraform/.terraform/
 terraform/.terraform.*
 terraform/terraform.tfvars
+
+*.env
+
+src/spotify_ingest/__pycache__/
+

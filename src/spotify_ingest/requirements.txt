@@ -1,0 +1,9 @@
+# For making HTTP requests to Spotify API
+requests>=2.26.0
+
+# Google Cloud client libraries
+google-cloud-secret-manager>=2.12.0  # To access API keys from Secret Manager
+google-cloud-storage>=2.5.0          # To upload data to GCS
+
+# Google Cloud Functions Framework for local development & deployment
+functions-framework>=3.0.0
