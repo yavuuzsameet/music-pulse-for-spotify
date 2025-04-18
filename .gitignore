@@ -11,3 +11,8 @@ terraform/terraform.tfvars
 src/spotify_ingest/__pycache__/
 placeholder*
 
+dbt/logs/
+dbt/dbt4pulse/logs/
+dbt/dbt4pulse/target/
+dbt/dbt4pulse/dbt_packages/
+
