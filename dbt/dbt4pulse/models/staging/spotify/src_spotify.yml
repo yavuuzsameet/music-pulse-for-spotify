@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: spotify_raw
+    description: "Raw data ingested from Spotify API, landed in GCS and exposed via BQ external tables."
+    schema: music_pulse_warehouse
+
+    tables:
+      - name: raw_spotify_top_tracks 
+        description: "External table pointing to raw NDJSON files containing user's top tracks."
+        # TODO: ADD COLUMNS
+
+      - name: raw_spotify_top_artists 
+        description: "External table pointing to raw NDJSON files containing user's top artists."
+        # TODO: ADD COLUMNS
