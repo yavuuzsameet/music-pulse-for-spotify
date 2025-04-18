@@ -186,14 +186,15 @@ def spotify_ingest_http(request):
         year = run_timestamp.strftime('%Y')
         month = run_timestamp.strftime('%m') 
         day = run_timestamp.strftime('%d')  
-        base_gcs_path = f"spotify/raw/year={year}/month={month}/day={day}"
+        base_gcs_path_tracks = f"spotify/raw/tracks/year={year}/month={month}/day={day}"
+        base_gcs_path_artists = f"spotify/raw/artists/year={year}/month={month}/day={day}"
         timestamp_suffix = run_timestamp.strftime('%Y%m%d_%H%M%S')
 
         # 3. Fetch Playlist Data from Spotify API
         # --- Fetch and Upload Top Tracks ---
         try:
             top_tracks_data = fetch_spotify_top_items(access_token, "tracks")
-            tracks_blob_name = f"{base_gcs_path}/top_tracks_{TIME_RANGE}_{timestamp_suffix}.json"
+            tracks_blob_name = f"{base_gcs_path_tracks}/top_tracks_{TIME_RANGE}_{timestamp_suffix}.json"
             upload_to_gcs(GCS_BUCKET_NAME, tracks_blob_name, top_tracks_data)
         except Exception as e:
             print(f"Failed to process top tracks: {e}")
@@ -201,7 +202,7 @@ def spotify_ingest_http(request):
         # --- Fetch and Upload Top Artists ---
         try:
             top_artists_data = fetch_spotify_top_items(access_token, "artists")
-            artists_blob_name = f"{base_gcs_path}/top_artists_{TIME_RANGE}_{timestamp_suffix}.json"
+            artists_blob_name = f"{base_gcs_path_artists}/top_artists_{TIME_RANGE}_{timestamp_suffix}.json"
             upload_to_gcs(GCS_BUCKET_NAME, artists_blob_name, top_artists_data)
         except Exception as e:
             print(f"Failed to process top artists: {e}")

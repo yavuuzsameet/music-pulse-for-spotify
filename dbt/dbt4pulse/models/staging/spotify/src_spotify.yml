@@ -8,8 +8,70 @@ sources:
     tables:
       - name: raw_spotify_top_tracks 
         description: "External table pointing to raw NDJSON files containing user's top tracks."
-        # TODO: ADD COLUMNS
+        columns:
+          - name: type
+            description: "Type of the object. In this case, it will always be 'track'."
+          - name: popularity
+            description: "Popularity of the track. The value will be between 0 and 100, with 100 being the most popular."
+          - name: uri
+            description: "Spotify URI for the track. This is a unique identifier for the track in Spotify's system."
+          - name: name
+            description: "Name of the track. This is the display name that users see on Spotify."
+          - name: is_playable
+            description: "Indicates whether the track is playable on Spotify. This is a boolean value."
+          - name: href
+            description: "A link to the track's Spotify page. This is a URL that users can click to view the track's profile."
+          - name: id
+            description: "Unique identifier for the track in Spotify's system. This is a string value."
+          - name: external_urls
+            description: "External URLs for the track. This is a JSON object containing links to the track on various platforms."
+          - name: preview_url
+            description: "A URL that can be used to preview the track. This is a string value."
+          - name: duration_ms
+            description: "Duration of the track in milliseconds. This is an integer value."
+          - name: explicit
+            description: "Indicates whether the track contains explicit content. This is a boolean value."
+          - name: track_number
+            description: "Track number in the album. This is an integer value."
+          - name: external_ids
+            description: "External IDs for the track. This is a JSON object containing various identifiers for the track."
+          - name: is_local
+            description: "Indicates whether the track is stored locally. This is a boolean value."
+          - name: disc_number
+            description: "Disc number in the album. This is an integer value."
+          - name: available_markets
+            description: "List of markets where the track is available. This is a JSON array containing country codes."
+          - name: artists
+            description: "List of artists associated with the track. This is a JSON array containing artist objects."
+          - name: album
+            description: "Album associated with the track. This is a JSON object containing album details."
+          - name: year
+            description: "Year the track was released. This is an integer value."
+          - name: month
+            description: "Month the track was released. This is an integer value."
+          - name: day
+            description: "Day the track was released. This is an integer value."
 
       - name: raw_spotify_top_artists 
         description: "External table pointing to raw NDJSON files containing user's top artists."
-        # TODO: ADD COLUMNS
+        columns:
+          - name: popularity
+            description: "Popularity of the artist. The value will be between 0 and 100, with 100 being the most popular."
+          - name: name
+            description: "Name of the artist. This is the display name that users see on Spotify."
+          - name: images
+            description: "List of images associated with the artist. This is a JSON array containing image objects."
+          - name: uri
+            description: "Spotify URI for the artist. This is a unique identifier for the artist in Spotify's system."
+          - name: type
+            description: "Type of the object. In this case, it will always be 'artist'."
+          - name: href
+            description: "A link to the artist's Spotify page. This is a URL that users can click to view the artist's profile."
+          - name: genres
+            description: "List of genres associated with the artist. This is a JSON array containing genre strings."
+          - name: id
+            description: "Unique identifier for the artist in Spotify's system. This is a string value."
+          - name: followers
+            description: "Number of followers the artist has on Spotify. This is a JSON value containing total and href."
+          - name: external_urls
+            description: "External URLs for the artist. This is a JSON object containing links to the artist on various platforms."

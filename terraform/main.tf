@@ -255,11 +255,11 @@ resource "google_bigquery_table" "raw_spotify_top_tracks" {
 
     source_uris = [
        # Use a single wildcard - combined with hive partitioning below
-       "gs://${google_storage_bucket.data_lake.name}/spotify/raw/*"
+       "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/*"
     ]
     hive_partitioning_options {
       mode = "CUSTOM" 
-      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
     }
   }
 
@@ -277,11 +277,11 @@ resource "google_bigquery_table" "raw_spotify_top_artists" {
   external_data_configuration {
     source_uris = [
       # Use wildcards to match files across date partitions
-      "gs://${google_storage_bucket.data_lake.name}/spotify/raw/*"
+      "gs://${google_storage_bucket.data_lake.name}/spotify/raw/artists/*"
     ]
     hive_partitioning_options {
       mode = "CUSTOM" 
-      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/artists/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
     }
     
     source_format = "NEWLINE_DELIMITED_JSON"
