@@ -237,3 +237,56 @@ resource "google_cloud_run_service_iam_member" "invoker" {
   # Depends on the function being created, implicitly handles underlying service readiness
   depends_on = [google_cloudfunctions2_function.spotify_ingest_function]
 }
+
+
+# --- BigQuery External Table for Raw Spotify Top Tracks ---
+
+resource "google_bigquery_table" "raw_spotify_top_tracks" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id 
+  table_id   = "raw_spotify_top_tracks"  
+
+  # Define the external data source configuration
+  external_data_configuration {
+    source_format = "NEWLINE_DELIMITED_JSON" # Specify the format of the files in GCS
+
+    # Use BigQuery's schema auto-detection for JSON files
+    autodetect = true
+
+    source_uris = [
+       # Use a single wildcard - combined with hive partitioning below
+       "gs://${google_storage_bucket.data_lake.name}/spotify/raw/*"
+    ]
+    hive_partitioning_options {
+      mode = "CUSTOM" 
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+    }
+  }
+
+  # Ensure the dataset exists before creating the table
+  depends_on = [google_bigquery_dataset.data_warehouse]
+}
+
+# --- BigQuery External Table for Raw Spotify Top Artists ---
+
+resource "google_bigquery_table" "raw_spotify_top_artists" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id 
+  table_id   = "raw_spotify_top_artists" 
+
+  external_data_configuration {
+    source_uris = [
+      # Use wildcards to match files across date partitions
+      "gs://${google_storage_bucket.data_lake.name}/spotify/raw/*"
+    ]
+    hive_partitioning_options {
+      mode = "CUSTOM" 
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+    }
+    
+    source_format = "NEWLINE_DELIMITED_JSON"
+    autodetect    = true 
+  }
+
+  depends_on = [google_bigquery_dataset.data_warehouse]
+}

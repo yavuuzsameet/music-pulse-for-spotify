@@ -94,11 +94,62 @@ def fetch_spotify_top_items(access_token, item_type):
         raise RuntimeError(f"Failed to fetch Spotify top {item_type}") from e
 
 def upload_to_gcs(bucket_name, destination_blob_name, data_dict):
+
+    def convert2ndjson(data_dict, item_key='items'):
+        """
+        Extracts items from data_dict using item_key, converts each item
+        to a compact JSON string, and joins them with newlines (NDJSON format).
+
+        Args:
+            data_dict (dict): The dictionary containing the list of items (e.g., API response).
+            item_key (str): The key within data_dict that holds the list of items. Defaults to 'items'.
+
+        Returns:
+            str: A string formatted as NDJSON, or an empty string if no items are found
+                or if input is invalid. Includes a trailing newline if items were processed.
+        """
+        ndjson_string = ""
+
+        if not data_dict or not isinstance(data_dict, dict):
+            print(f"WARN: Invalid data_dict provided to convert_to_ndjson. Expected dict, got {type(data_dict)}")
+            return ndjson_string
+        
+        items = data_dict.get(item_key, [])
+        if not items or not isinstance(items, list):
+            print(f"WARN: No items list found under key '{item_key}' for NDJSON conversion.")
+            return ndjson_string
+        
+        # Convert each item dictionary to a compact JSON string and join with newlines
+        try:
+            # Filter out potential None items from the list first
+            valid_items = [item for item in items if item is not None]
+            if not valid_items:
+                print(f"WARN: No valid (non-None) items found under key '{item_key}' for NDJSON conversion.")
+                return "" # Return empty string if only None items were present
+
+            ndjson_lines = [json.dumps(item, separators=(',', ':')) for item in valid_items]
+            ndjson_string = "\n".join(ndjson_lines)
+            # Add a trailing newline if there were any items (good practice for NDJSON)
+            ndjson_string += "\n"
+            print(f"Successfully converted {len(valid_items)} items to NDJSON format.")
+
+        except TypeError as e:
+            print(f"Error converting item to JSON during NDJSON creation: {e}")
+            # Decide if you want to raise an error or return partially converted data / empty string
+            # Returning empty string for safety here
+            return ""
+        except Exception as e:
+            print(f"Unexpected error during NDJSON conversion: {e}")
+            return "" # Return empty string on other errors
+
+        return ndjson_string
+
+
     """Uploads dictionary data (as JSON string) to a GCS bucket."""
     if not bucket_name:
         raise ValueError("GCS_BUCKET_NAME environment variable not set.")
     try:
-        data_string = json.dumps(data_dict, indent=2) # Convert dict to formatted JSON string
+        data_string = convert2ndjson(data_dict)
         bucket = storage_client.bucket(bucket_name)
         blob = bucket.blob(destination_blob_name)
         blob.upload_from_string(data_string, content_type='application/json')
@@ -132,7 +183,10 @@ def spotify_ingest_http(request):
             raise ValueError("Could not obtain Spotify access token.")
         
         # --- Define GCS paths ---
-        base_gcs_path = f"spotify/raw/{run_timestamp.strftime('%Y/%m/%d')}"
+        year = run_timestamp.strftime('%Y')
+        month = run_timestamp.strftime('%m') 
+        day = run_timestamp.strftime('%d')  
+        base_gcs_path = f"spotify/raw/year={year}/month={month}/day={day}"
         timestamp_suffix = run_timestamp.strftime('%Y%m%d_%H%M%S')
 
         # 3. Fetch Playlist Data from Spotify API
@@ -143,6 +197,14 @@ def spotify_ingest_http(request):
             upload_to_gcs(GCS_BUCKET_NAME, tracks_blob_name, top_tracks_data)
         except Exception as e:
             print(f"Failed to process top tracks: {e}")
+
+        # --- Fetch and Upload Top Artists ---
+        try:
+            top_artists_data = fetch_spotify_top_items(access_token, "artists")
+            artists_blob_name = f"{base_gcs_path}/top_artists_{TIME_RANGE}_{timestamp_suffix}.json"
+            upload_to_gcs(GCS_BUCKET_NAME, artists_blob_name, top_artists_data)
+        except Exception as e:
+            print(f"Failed to process top artists: {e}")
 
         print("Spotify ingestion successful.")
         return ("OK", 200)
