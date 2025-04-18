@@ -42,7 +42,7 @@ resource "google_bigquery_dataset" "data_warehouse" {
   }
 }
 
-# Secret Management - Secret Containers (values added manually later)
+# Secret Management
 resource "google_secret_manager_secret" "spotify_client_id" {
   secret_id = "spotify-client-id"
 
@@ -71,11 +71,12 @@ resource "google_secret_manager_secret" "spotify_client_secret" {
   }
 }
 
-resource "google_secret_manager_secret" "discord_bot_application_id" {
-  secret_id = "discord-bot-application-id"
+resource "google_secret_manager_secret" "spotify_refresh_token" {
+  secret_id = "spotify-refresh-token"
+  project   = var.project_id
 
   replication {
-    auto {}
+    auto {} 
   }
 
   labels = {
@@ -85,47 +86,154 @@ resource "google_secret_manager_secret" "discord_bot_application_id" {
   }
 }
 
-resource "google_secret_manager_secret" "discord_bot_public_key" {
-  secret_id = "discord-bot-public-key"
+# resource "google_secret_manager_secret" "discord_bot_application_id" {
+#   secret_id = "discord-bot-application-id"
 
-  replication {
-    auto {}
-  }
+#   replication {
+#     auto {}
+#   }
 
-  labels = {
-    environment = "dev"
-    project     = "music-pulse"
-    purpose     = "api-credential"
-  }
+#   labels = {
+#     environment = "dev"
+#     project     = "music-pulse"
+#     purpose     = "api-credential"
+#   }
+# }
 
+# resource "google_secret_manager_secret" "discord_bot_public_key" {
+#   secret_id = "discord-bot-public-key"
+
+#   replication {
+#     auto {}
+#   }
+
+#   labels = {
+#     environment = "dev"
+#     project     = "music-pulse"
+#     purpose     = "api-credential"
+#   }
+
+# }
+
+# resource "google_secret_manager_secret" "ticketmaster_api_key" {
+#   secret_id = "ticketmaster-api-key"
+
+#   replication {
+#     auto {}
+#   }
+
+#   labels = {
+#     environment = "dev"
+#     project     = "music-pulse"
+#     purpose     = "api-credential"
+#   }
+# }
+
+# resource "google_secret_manager_secret" "ticketmaster_api_secret" {
+#   secret_id = "ticketmaster-api-secret"
+#   replication {
+#     auto {}
+#   }
+
+#   labels = {
+#     environment = "dev"
+#     project     = "music-pulse"
+#     purpose     = "api-credential"
+#   }
+#}
+
+# --- Cloud Function Service Account and Permissions ---
+
+# Service Account for Cloud Functions to run as
+resource "google_service_account" "spotify_ingest_sa" {
+  account_id   = "spotify-ingest-sa"
+  display_name = "Service Account for Spotify Ingestion Function"
+  project      = var.project_id
 }
 
-resource "google_secret_manager_secret" "ticketmaster_api_key" {
-  secret_id = "ticketmaster-api-key"
-
-  replication {
-    auto {}
-  }
-
-  labels = {
-    environment = "dev"
-    project     = "music-pulse"
-    purpose     = "api-credential"
-  }
+# Grant Service Account permission to access Spotify secrets
+resource "google_secret_manager_secret_iam_member" "spotify_client_id_accessor" {
+  project   = google_secret_manager_secret.spotify_client_id.project
+  secret_id = google_secret_manager_secret.spotify_client_id.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.spotify_ingest_sa.email}"
 }
 
-resource "google_secret_manager_secret" "ticketmaster_api_secret" {
-  secret_id = "ticketmaster-api-secret"
-  replication {
-    auto {}
-  }
-
-  labels = {
-    environment = "dev"
-    project     = "music-pulse"
-    purpose     = "api-credential"
-  }
-
+resource "google_secret_manager_secret_iam_member" "spotify_client_secret_accessor" {
+  project   = google_secret_manager_secret.spotify_client_secret.project
+  secret_id = google_secret_manager_secret.spotify_client_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.spotify_ingest_sa.email}"
 }
 
-### TODO: INCLUDE SPOTIFY REFRESH TOKEN
+resource "google_secret_manager_secret_iam_member" "spotify_refresh_token_accessor" {
+  project   = google_secret_manager_secret.spotify_refresh_token.project
+  secret_id = google_secret_manager_secret.spotify_refresh_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.spotify_ingest_sa.email}"
+}
+
+# Grant Service Account permission to write to the GCS Data Lake bucket
+resource "google_storage_bucket_iam_member" "data_lake_writer" {
+  bucket = google_storage_bucket.data_lake.name
+  role   = "roles/storage.objectCreator"
+  member = "serviceAccount:${google_service_account.spotify_ingest_sa.email}"
+}
+
+
+# --- Cloud Function Definition ---
+
+resource "google_cloudfunctions2_function" "spotify_ingest_function" {
+  name        = "spotify-ingest-function" 
+  location    = var.region                
+  project     = var.project_id
+
+  build_config {
+    runtime     = "python310" 
+    entry_point = "spotify_ingest_http"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.data_lake.name
+        object = "tf-sources/placeholder.zip" 
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1 
+    min_instance_count = 0 
+    available_memory   = "256Mi" 
+    timeout_seconds    = 120     
+
+    environment_variables = {
+      GCP_PROJECT_ID  = var.project_id
+      GCS_BUCKET_NAME = google_storage_bucket.data_lake.name
+    }
+    
+    # Use the dedicated service account
+    service_account_email = google_service_account.spotify_ingest_sa.email
+    
+    # Allow public HTTP access for now for Kestra trigger
+    ingress_settings               = "ALLOW_ALL"
+    all_traffic_on_latest_revision = true
+  }
+
+  # Ensure secrets exist before creating function that needs access to them
+  depends_on = [
+    google_secret_manager_secret.spotify_client_id,
+    google_secret_manager_secret.spotify_client_secret,
+    google_secret_manager_secret.spotify_refresh_token,
+  ]
+}
+
+# Grant public access to invoke the underlying Cloud Run service
+resource "google_cloud_run_service_iam_member" "invoker" {
+  location = google_cloudfunctions2_function.spotify_ingest_function.location
+  project  = google_cloudfunctions2_function.spotify_ingest_function.project
+  service  = google_cloudfunctions2_function.spotify_ingest_function.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+
+  # Depends on the function being created, implicitly handles underlying service readiness
+  depends_on = [google_cloudfunctions2_function.spotify_ingest_function]
+}

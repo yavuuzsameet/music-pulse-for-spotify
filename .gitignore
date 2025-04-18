@@ -1,5 +1,7 @@
 terraform/ignore.txt
 terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfstate.*
 terraform/.terraform/
 terraform/.terraform.*
 terraform/terraform.tfvars
@@ -7,4 +9,5 @@ terraform/terraform.tfvars
 *.env
 
 src/spotify_ingest/__pycache__/
+placeholder*
 
