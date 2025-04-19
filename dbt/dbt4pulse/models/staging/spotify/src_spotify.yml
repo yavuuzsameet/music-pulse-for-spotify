@@ -46,11 +46,11 @@ sources:
           - name: album
             description: "Album associated with the track. This is a JSON object containing album details."
           - name: year
-            description: "Year the track was released. This is an integer value."
+            description: "Partition year. This is an integer value."
           - name: month
-            description: "Month the track was released. This is an integer value."
+            description: "Partition month. This is an integer value."
           - name: day
-            description: "Day the track was released. This is an integer value."
+            description: "Partition day. This is an integer value."
 
       - name: raw_spotify_top_artists 
         description: "External table pointing to raw NDJSON files containing user's top artists."
@@ -75,3 +75,9 @@ sources:
             description: "Number of followers the artist has on Spotify. This is a JSON value containing total and href."
           - name: external_urls
             description: "External URLs for the artist. This is a JSON object containing links to the artist on various platforms."
+          - name: year
+            description: "Partition year. This is an integer value."
+          - name: month
+            description: "Partition month. This is an integer value."
+          - name: day
+            description: "Partition day. This is an integer value."
