@@ -7,6 +7,7 @@ from google.cloud import bigquery
 from google.cloud import secretmanager
 from dotenv import load_dotenv
 import functions_framework
+import datetime
 
 # --- Configuration ---
 load_dotenv() # Load .env file for local execution
@@ -243,6 +244,12 @@ def enrich_artists_http(request):
         latest_snapshot_date = results_date[0].max_date
         print(f"Latest snapshot date: {latest_snapshot_date}")
         print(f"Latest snapshot date type: {type(latest_snapshot_date)}")
+
+        # # 2025-04-01
+        # # do backfilling for 2025-04-01
+        # latest_snapshot_date = datetime.date(2025, 4, 10)
+        # print(f"Latest snapshot date: {latest_snapshot_date}")
+        # print(f"Latest snapshot date type: {type(latest_snapshot_date)}")
 
         # 2. Get distinct primary artist IDs from the latest snapshot
         print("Fetching distinct primary artist IDs from latest snapshot...")
