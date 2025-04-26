@@ -281,6 +281,20 @@ resource "google_bigquery_dataset_iam_member" "enrich_bq_editor" {
   member     = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
 }
 
+# Grant Enrichment SA permission to run BigQuery jobs in the project
+resource "google_project_iam_member" "enrich_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.user" # Grants permission to run jobs (includes bigquery.jobs.create)
+  member  = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
+# Grant Enrichment SA permission to read GCS bucket objects (for BQ external tables)
+resource "google_storage_bucket_iam_member" "enrich_gcs_viewer" {
+  bucket = google_storage_bucket.data_lake.name # Reference your data lake bucket
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
 # --- Cloud Function Definition ---
 
 resource "google_cloudfunctions2_function" "enrich_artists_function" {
