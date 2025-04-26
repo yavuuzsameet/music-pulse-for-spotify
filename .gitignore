@@ -9,6 +9,7 @@ terraform/terraform.tfvars
 *.env
 
 src/spotify_ingest/__pycache__/
+src/enrich_artists/__pycache__/
 placeholder*
 
 dbt/logs/
@@ -16,3 +17,8 @@ dbt/dbt4pulse/logs/
 dbt/dbt4pulse/target/
 dbt/dbt4pulse/dbt_packages/
 
+.DS_Store
+*DS_Store
+DS_Store*
+*.DS_Store
+**/.DS_Store

@@ -76,7 +76,7 @@ resource "google_secret_manager_secret" "spotify_refresh_token" {
   project   = var.project_id
 
   replication {
-    auto {} 
+    auto {}
   }
 
   labels = {
@@ -142,6 +142,7 @@ resource "google_secret_manager_secret" "spotify_refresh_token" {
 #   }
 #}
 
+# --- SPOTIFY INGEST FUNCTION ---
 # --- Cloud Function Service Account and Permissions ---
 
 # Service Account for Cloud Functions to run as
@@ -184,35 +185,35 @@ resource "google_storage_bucket_iam_member" "data_lake_writer" {
 # --- Cloud Function Definition ---
 
 resource "google_cloudfunctions2_function" "spotify_ingest_function" {
-  name        = "spotify-ingest-function" 
-  location    = var.region                
-  project     = var.project_id
+  name     = "spotify-ingest-function"
+  location = var.region
+  project  = var.project_id
 
   build_config {
-    runtime     = "python310" 
+    runtime     = "python310"
     entry_point = "spotify_ingest_http"
     source {
       storage_source {
         bucket = google_storage_bucket.data_lake.name
-        object = "tf-sources/placeholder.zip" 
+        object = "tf-sources/placeholder.zip"
       }
     }
   }
 
   service_config {
-    max_instance_count = 1 
-    min_instance_count = 0 
-    available_memory   = "256Mi" 
-    timeout_seconds    = 120     
+    max_instance_count = 1
+    min_instance_count = 0
+    available_memory   = "256Mi"
+    timeout_seconds    = 120
 
     environment_variables = {
       GCP_PROJECT_ID  = var.project_id
       GCS_BUCKET_NAME = google_storage_bucket.data_lake.name
     }
-    
+
     # Use the dedicated service account
     service_account_email = google_service_account.spotify_ingest_sa.email
-    
+
     # Allow public HTTP access for now for Kestra trigger
     ingress_settings               = "ALLOW_ALL"
     all_traffic_on_latest_revision = true
@@ -239,12 +240,109 @@ resource "google_cloud_run_service_iam_member" "invoker" {
 }
 
 
+
+# --- SPOTIFY ENRICH ARTISTS FUNCTION ---
+# --- Cloud Function Service Account and Permissions ---
+
+# Service Account for the Artist Enrichment Function
+resource "google_service_account" "enrich_artists_sa" {
+  account_id   = "enrich-artists-sa"
+  display_name = "Service Account for Artist Enrichment Function"
+  project      = var.project_id
+}
+
+# Grant Enrichment SA permission to access Spotify secrets
+resource "google_secret_manager_secret_iam_member" "enrich_spotify_client_id_accessor" {
+  project   = google_secret_manager_secret.spotify_client_id.project
+  secret_id = google_secret_manager_secret.spotify_client_id.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "enrich_spotify_client_secret_accessor" {
+  project   = google_secret_manager_secret.spotify_client_secret.project
+  secret_id = google_secret_manager_secret.spotify_client_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "enrich_spotify_refresh_token_accessor" {
+  project   = google_secret_manager_secret.spotify_refresh_token.project
+  secret_id = google_secret_manager_secret.spotify_refresh_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
+# Grant Enrichment SA permission to read/write BigQuery dataset (for reading staging/writing dims)
+resource "google_bigquery_dataset_iam_member" "enrich_bq_editor" {
+  project    = var.project_id
+  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id
+  role       = "roles/bigquery.dataEditor"
+  member     = "serviceAccount:${google_service_account.enrich_artists_sa.email}"
+}
+
+# --- Cloud Function Definition ---
+
+resource "google_cloudfunctions2_function" "enrich_artists_function" {
+  name     = "enrich-artists-function"
+  location = var.region
+  project  = var.project_id
+
+  build_config {
+    runtime     = "python310"
+    entry_point = "enrich_artists_http"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.data_lake.name
+        object = "tf-sources/placeholder.zip"
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1
+    min_instance_count = 0
+    available_memory   = "256Mi"
+    timeout_seconds    = 180
+    # Environment variables needed by the enrichment function's Python code
+    environment_variables = {
+      GCP_PROJECT_ID       = var.project_id
+      BQ_DATASET_ID        = google_bigquery_dataset.data_warehouse.dataset_id
+      DIM_ARTISTS_TABLE_ID = "dim_artists"
+      STG_TRACKS_TABLE_ID  = "stg_top_tracks"
+    }
+    # Run as the dedicated service account
+    service_account_email          = google_service_account.enrich_artists_sa.email
+    ingress_settings               = "ALLOW_ALL" # Public trigger for Kestra/testing
+    all_traffic_on_latest_revision = true
+  }
+
+  # Ensure secrets the SA needs access to exist before creating function
+  depends_on = [
+    google_secret_manager_secret.spotify_client_id,
+    google_secret_manager_secret.spotify_client_secret,
+    google_secret_manager_secret.spotify_refresh_token,
+  ]
+}
+
+# Grant public access to invoke the new enrichment function's underlying service
+resource "google_cloud_run_service_iam_member" "enrich_invoker" {
+  location = google_cloudfunctions2_function.enrich_artists_function.location
+  project  = google_cloudfunctions2_function.enrich_artists_function.project
+  service  = google_cloudfunctions2_function.enrich_artists_function.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+
+  depends_on = [google_cloudfunctions2_function.enrich_artists_function]
+}
+
+
 # --- BigQuery External Table for Raw Spotify Top Tracks ---
 
 resource "google_bigquery_table" "raw_spotify_top_tracks" {
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id 
-  table_id   = "raw_spotify_top_tracks"  
+  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id
+  table_id   = "raw_spotify_top_tracks"
 
   # Define the external data source configuration
   external_data_configuration {
@@ -254,12 +352,12 @@ resource "google_bigquery_table" "raw_spotify_top_tracks" {
     autodetect = true
 
     source_uris = [
-       # Use a single wildcard - combined with hive partitioning below
-       "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/*"
+      # Use a single wildcard - combined with hive partitioning below
+      "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/*"
     ]
     hive_partitioning_options {
-      mode = "CUSTOM" 
-      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/tracks/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}"
     }
   }
 
@@ -271,8 +369,8 @@ resource "google_bigquery_table" "raw_spotify_top_tracks" {
 
 resource "google_bigquery_table" "raw_spotify_top_artists" {
   project    = var.project_id
-  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id 
-  table_id   = "raw_spotify_top_artists" 
+  dataset_id = google_bigquery_dataset.data_warehouse.dataset_id
+  table_id   = "raw_spotify_top_artists"
 
   external_data_configuration {
     source_uris = [
@@ -280,12 +378,12 @@ resource "google_bigquery_table" "raw_spotify_top_artists" {
       "gs://${google_storage_bucket.data_lake.name}/spotify/raw/artists/*"
     ]
     hive_partitioning_options {
-      mode = "CUSTOM" 
-      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/artists/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}" 
+      mode              = "CUSTOM"
+      source_uri_prefix = "gs://${google_storage_bucket.data_lake.name}/spotify/raw/artists/{year:INTEGER}/{month:INTEGER}/{day:INTEGER}"
     }
-    
+
     source_format = "NEWLINE_DELIMITED_JSON"
-    autodetect    = true 
+    autodetect    = true
   }
 
   depends_on = [google_bigquery_dataset.data_warehouse]
