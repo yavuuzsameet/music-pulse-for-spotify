@@ -22,3 +22,5 @@ dbt/dbt4pulse/dbt_packages/
 DS_Store*
 *.DS_Store
 **/.DS_Store
+
+kestra/secrets/

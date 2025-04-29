@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  kestra:
+    image: kestra/kestra:latest 
+    container_name: kestra_standalone
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Expose Kestra UI on port 8080
+    volumes:
+      - kestra_data:/app/data # Persistent storage for Kestra's internal data
+      # Mount your GCP service account key file from the host VM into the container
+      # IMPORTANT: Replace '/path/on/vm/gcp-key.json' with the actual path on GCE VM
+      - ./secrets/music-pulse-portfolio-gcp-creds.json:/app/gcp-key.json:ro # Mount as read-only
+    environment:
+      # Make the mounted GCP key file available for Application Default Credentials (ADC)
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-key.json
+      KESTRA_CONFIGURATION: |
+        kestra:
+          repository:
+            type: memory 
+          queue:
+            type: memory 
+          storage:
+            type: local
+            local:
+              basePath: /app/data
+          executor:
+            type: local  
+    command: server standalone
+
+volumes:
+  kestra_data: 
